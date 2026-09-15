@@ -1,0 +1,91 @@
+name: 💾 Backup Hebdomadaire
+
+on:
+  # Chaque dimanche à 3h00 UTC
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Export CSV vers branche backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 📦 Installation des dépendances
+        run: pip install supabase python-dotenv
+
+      - name: 💾 Export des données
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python - <<'EOF'
+          import os, csv, json
+          from datetime import datetime, timezone
+          from supabase import create_client
+
+          client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+
+          # Export annonces
+          result = client.table("annonces").select("*").order("date_collecte", desc=True).execute()
+          annonces = result.data or []
+
+          os.makedirs("backup", exist_ok=True)
+          date_str = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+
+          # CSV
+          if annonces:
+              with open(f"backup/annonces_{date_str}.csv", "w", newline="", encoding="utf-8") as f:
+                  writer = csv.DictWriter(f, fieldnames=annonces[0].keys())
+                  writer.writeheader()
+                  writer.writerows(annonces)
+
+          # Métadonnées du backup
+          meta = {
+              "date": date_str,
+              "count_annonces": len(annonces),
+              "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+          }
+          with open("backup/metadata.json", "w") as f:
+              json.dump(meta, f, indent=2)
+
+          print(f"✅ Export: {len(annonces)} annonces → backup/annonces_{date_str}.csv")
+          EOF
+
+      - name: 📤 Commit vers branche backup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Créer ou switcher sur la branche backup (orpheline pour ne pas polluer main)
+          git fetch origin backup 2>/dev/null || true
+          git checkout backup 2>/dev/null || git checkout --orphan backup
+          
+          # Garder uniquement le dossier backup
+          git rm -rf --cached . 2>/dev/null || true
+          git add backup/
+          
+          DATE=$(date -u '+%Y-%m-%d')
+          git commit -m "backup: export automatique du $DATE" || echo "Rien à committer"
+          git push origin backup --force
+
+      - name: 📊 Résumé
+        if: always()
+        run: |
+          echo "## Backup hebdomadaire" >> $GITHUB_STEP_SUMMARY
+          echo "- Date: $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          if [ -f backup/metadata.json ]; then
+            cat backup/metadata.json >> $GITHUB_STEP_SUMMARY
+          fi

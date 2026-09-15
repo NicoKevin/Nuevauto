@@ -1,0 +1,54 @@
+# Sélecteurs CSS/XPath isolés par site
+# Modifier ce fichier suffit à adapter le scraper quand un site change sa structure HTML
+# Sans toucher au code Python — maintenance facilitée
+
+leboncoin:
+  # URL de base pour la recherche de voitures de particuliers
+  search_url: "https://www.leboncoin.fr/voitures/offres/"
+  # Paramètres de recherche (injectés dans l'URL)
+  search_params:
+    owner_type: "private"  # Particuliers uniquement
+  # Sélecteurs pour la page de résultats
+  listing:
+    # Conteneur de chaque annonce dans les résultats
+    card_selector: "article[data-qa-id='aditem_container']"
+    # URL de l'annonce (attribut href du lien principal)
+    url_selector: "a[data-qa-id='aditem_container']"
+    url_attribute: "href"
+    # Prix
+    price_selector: "span[data-qa-id='aditem_price']"
+    # Titre (marque + modèle)
+    title_selector: "p[data-qa-id='aditem_title']"
+    # Localisation
+    location_selector: "p[data-qa-id='aditem_location']"
+    # Date de publication
+    date_selector: "p[data-qa-id='aditem_date']"
+  # Sélecteurs pour la page détail d'une annonce
+  detail:
+    price_selector: "span[data-qa-id='adview_price']"
+    description_selector: "div[data-qa-id='adview_description_container']"
+    # Attributs structurés (liste clé-valeur dans la fiche)
+    criteria_list_selector: "div[data-qa-id='criteria_list']"
+    criteria_item_selector: "div[data-qa-id='criteria_list'] > div"
+
+lacentrale:
+  search_url: "https://www.lacentrale.fr/listing"
+  search_params:
+    vendor: "particular"  # Particuliers uniquement
+  listing:
+    card_selector: "div.searchCard"
+    url_selector: "a.searchCard"
+    url_attribute: "href"
+    price_selector: "span.price"
+    title_selector: "h2.vehicleTitle"
+    location_selector: "span.location"
+    date_selector: "span.publicationDate"
+  detail:
+    price_selector: "span.mainPrice"
+    description_selector: "div.descriptionContent"
+    criteria_list_selector: "ul.vehicleCharacteristics"
+    criteria_item_selector: "li.characteristicItem"
+
+# NOTE: Ces sélecteurs sont susceptibles de changer quand les sites mettent à jour leur structure.
+# Si le scraper échoue à parser des annonces, commencez par vérifier ici.
+# Un test de parsing (tests/test_parsing.py) alertera si les sélecteurs ne matchent plus.

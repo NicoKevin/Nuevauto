@@ -1,0 +1,46 @@
+name: 🧪 Tests CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scraper/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scraper/**"
+
+jobs:
+  test:
+    name: Tests unitaires + anti-PII
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "scraper/pyproject.toml"
+
+      - name: 📦 Installation des dépendances
+        run: |
+          cd scraper
+          pip install -e ".[dev]"
+
+      - name: ✅ Tests anti-PII (BLOQUANTS)
+        run: |
+          cd scraper
+          python -m pytest tests/test_no_pii.py -v --tb=long
+
+      - name: 🧪 Tous les tests
+        run: |
+          cd scraper
+          python -m pytest tests/ -v --tb=short --cov=. --cov-report=xml
+
+      - name: 🔍 Linting
+        run: |
+          cd scraper
+          python -m ruff check . --output-format=github
