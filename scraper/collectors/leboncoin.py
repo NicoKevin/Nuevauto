@@ -11,14 +11,12 @@ pour ce collecteur, sans impacter les autres.
 
 from __future__ import annotations
 
-import re
-from typing import Iterator
+from collections.abc import Iterator
 
 import structlog
 from bs4 import BeautifulSoup
 
 from collectors.base import BaseCollector
-from config.settings import ScraperConfig
 from db.models import AnnonceRaw, Source
 
 logger = structlog.get_logger(__name__)
@@ -96,7 +94,7 @@ class LeBonCoinCollector(BaseCollector):
             if annonce:
                 yield annonce
 
-    def _parse_card(self, card: "BeautifulSoup") -> AnnonceRaw | None:
+    def _parse_card(self, card: BeautifulSoup) -> AnnonceRaw | None:
         """Parse une carte d'annonce individuelle."""
         listing_config = self.selectors.get("listing", {})
 

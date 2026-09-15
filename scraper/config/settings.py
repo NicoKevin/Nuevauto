@@ -15,7 +15,7 @@ class SupabaseConfig:
     service_key: str  # Clé service_role — bypass RLS, uniquement côté scraper/backend
 
     @classmethod
-    def from_env(cls) -> "SupabaseConfig":
+    def from_env(cls) -> SupabaseConfig:
         url = os.environ.get("SUPABASE_URL", "").strip()
         key = os.environ.get("SUPABASE_SERVICE_KEY", "").strip()
         if not url or not key:
@@ -56,7 +56,7 @@ class NotificationConfig:
     slack_webhook_url: str | None
 
     @classmethod
-    def from_env(cls) -> "NotificationConfig":
+    def from_env(cls) -> NotificationConfig:
         return cls(
             slack_webhook_url=os.environ.get("SLACK_WEBHOOK_URL") or None,
         )
@@ -73,7 +73,7 @@ class AppConfig:
     retention_ignored_days: int = 30
 
     @classmethod
-    def from_env(cls) -> "AppConfig":
+    def from_env(cls) -> AppConfig:
         return cls(
             supabase=SupabaseConfig.from_env(),
             scraper=ScraperConfig(),

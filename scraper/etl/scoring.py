@@ -5,7 +5,7 @@ Calcule un score de 0 à 100 basé sur la correspondance avec les critères de r
 
 from __future__ import annotations
 
-from typing import Optional
+import datetime as dt
 
 import structlog
 
@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 def score_annonce(
     annonce: AnnonceNormalisee,
     criteres: list[CritereRecherche],
-) -> tuple[float, Optional[str]]:
+) -> tuple[float, str | None]:
     """
     Calcule le score d'une annonce en la comparant aux critères actifs.
 
@@ -34,7 +34,7 @@ def score_annonce(
         return 0.0, None
 
     best_score = 0.0
-    best_critere_id: Optional[str] = None
+    best_critere_id: str | None = None
 
     for critere in criteres:
         partial_score = _score_against_critere(annonce, critere)
@@ -45,7 +45,10 @@ def score_annonce(
     return round(min(best_score, 100.0), 2), best_critere_id
 
 
-def _score_against_critere(annonce: AnnonceNormalisee, critere: CritereRecherche) -> float:
+def _score_against_critere(
+    annonce: AnnonceNormalisee,
+    critere: CritereRecherche,
+) -> float:
     """
     Score une annonce contre un critère spécifique.
     Score maximum = 100 si tous les critères correspondent parfaitement.
@@ -107,7 +110,9 @@ def _score_against_critere(annonce: AnnonceNormalisee, critere: CritereRecherche
     if critere.zone_geo:
         max_possible += 10
         if annonce.code_postal:
-            departements_cibles = {d.strip() for d in critere.zone_geo.split(",")}
+            departements_cibles = {
+                d.strip() for d in critere.zone_geo.split(",")
+            }
             if annonce.code_postal in departements_cibles:
                 score += 10
             # Bonus partiel si département contigu (simplifié)
@@ -124,8 +129,7 @@ def _score_against_critere(annonce: AnnonceNormalisee, critere: CritereRecherche
 
     # --- Malus fraîcheur (annonce très ancienne) ---
     if annonce.date_publication:
-        from datetime import datetime, timezone
-        age_days = (datetime.now(tz=timezone.utc) - annonce.date_publication).days
+        age_days = (dt.datetime.now(tz=dt.UTC) - annonce.date_publication).days
         if age_days > 30:
             normalized *= 0.7  # -30% si plus de 30 jours
         elif age_days > 14:

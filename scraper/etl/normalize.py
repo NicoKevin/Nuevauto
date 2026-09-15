@@ -5,10 +5,9 @@ Convertit AnnonceRaw → AnnonceNormalisee avec types stricts.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import re
-from datetime import datetime, timezone
-from typing import Optional
 
 import structlog
 
@@ -32,7 +31,9 @@ MARQUE_NORMALIZATION: dict[str, str] = {
     # BMW
     "bmw": "BMW",
     # Mercedes
-    "mercedes": "Mercedes-Benz", "mercedes-benz": "Mercedes-Benz", "mercédès": "Mercedes-Benz",
+    "mercedes": "Mercedes-Benz",
+    "mercedes-benz": "Mercedes-Benz",
+    "mercédès": "Mercedes-Benz",
     # Audi
     "audi": "Audi",
     # Toyota
@@ -61,17 +62,35 @@ MARQUE_NORMALIZATION: dict[str, str] = {
 
 # Modèles connus (marque -> [modèles])
 MODELES_CONNUS: dict[str, list[str]] = {
-    "Renault": ["Clio", "Mégane", "Megane", "Captur", "Kadjar", "Zoe", "Zoé", "Scenic", "Twingo", "Talisman", "Koleos"],
-    "Peugeot": ["208", "308", "3008", "5008", "2008", "508", "106", "107", "206", "207", "407", "Rifter"],
-    "Citroën": ["C3", "C4", "C5", "C1", "C2", "Berlingo", "Picasso", "DS3", "DS4", "DS5"],
-    "Volkswagen": ["Golf", "Polo", "Passat", "Tiguan", "T-Roc", "Touareg", "Up!", "ID.3", "ID.4"],
-    "BMW": ["Série 1", "Série 2", "Série 3", "Série 5", "X1", "X3", "X5"],
-    "Mercedes-Benz": ["Classe A", "Classe B", "Classe C", "Classe E", "GLA", "GLB", "GLC"],
+    "Renault": [
+        "Clio", "Mégane", "Megane", "Captur", "Kadjar",
+        "Zoe", "Zoé", "Scenic", "Twingo", "Talisman", "Koleos",
+    ],
+    "Peugeot": [
+        "208", "308", "3008", "5008", "2008", "508",
+        "106", "107", "206", "207", "407", "Rifter",
+    ],
+    "Citroën": [
+        "C3", "C4", "C5", "C1", "C2", "Berlingo",
+        "Picasso", "DS3", "DS4", "DS5",
+    ],
+    "Volkswagen": [
+        "Golf", "Polo", "Passat", "Tiguan", "T-Roc",
+        "Touareg", "Up!", "ID.3", "ID.4",
+    ],
+    "BMW": [
+        "Série 1", "Série 2", "Série 3", "Série 5",
+        "X1", "X3", "X5",
+    ],
+    "Mercedes-Benz": [
+        "Classe A", "Classe B", "Classe C", "Classe E",
+        "GLA", "GLB", "GLC",
+    ],
     "Dacia": ["Sandero", "Duster", "Logan", "Spring", "Jogger"],
 }
 
 
-def normalize_annonce(raw: AnnonceRaw) -> Optional[AnnonceNormalisee]:
+def normalize_annonce(raw: AnnonceRaw) -> AnnonceNormalisee | None:
     """
     Transforme une AnnonceRaw en AnnonceNormalisee.
     Retourne None si les données sont trop incomplètes pour être utiles.
@@ -107,12 +126,15 @@ def normalize_annonce(raw: AnnonceRaw) -> Optional[AnnonceNormalisee]:
         return None
 
 
-def _parse_prix(prix_brut: Optional[str]) -> Optional[float]:
+def _parse_prix(prix_brut: str | None) -> float | None:
     """Extrait le prix numérique depuis une chaîne comme '8 500 €' ou '12500€'."""
     if not prix_brut:
         return None
     # Supprimer tout sauf chiffres et virgule/point
-    cleaned = re.sub(r"[^\d,.]", "", prix_brut.replace("\u202f", "").replace("\xa0", ""))
+    cleaned = re.sub(
+        r"[^\d,.]", "",
+        prix_brut.replace("\u202f", "").replace("\xa0", ""),
+    )
     # Gérer les formats européens (virgule décimale)
     cleaned = cleaned.replace(",", ".")
     try:
@@ -121,7 +143,9 @@ def _parse_prix(prix_brut: Optional[str]) -> Optional[float]:
         return None
 
 
-def _parse_localisation(ville_brut: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def _parse_localisation(
+    ville_brut: str | None,
+) -> tuple[str | None, str | None]:
     """
     Extrait ville et code postal depuis une chaîne comme:
     - 'Paris (75001)' → ('Paris', '75')
@@ -144,7 +168,9 @@ def _parse_localisation(ville_brut: Optional[str]) -> tuple[Optional[str], Optio
     return ville, departement
 
 
-def _extract_marque_modele(titre: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def _extract_marque_modele(
+    titre: str | None,
+) -> tuple[str | None, str | None]:
     """
     Tente d'extraire la marque et le modèle depuis le titre de l'annonce.
     Ex: 'Renault Clio IV 1.5 dCi 90 CH' → ('Renault', 'Clio')
@@ -155,7 +181,10 @@ def _extract_marque_modele(titre: Optional[str]) -> tuple[Optional[str], Optiona
     titre_lower = titre.lower().strip()
 
     for raw_marque, marque_canon in MARQUE_NORMALIZATION.items():
-        if titre_lower.startswith(raw_marque) or f" {raw_marque} " in f" {titre_lower} ":
+        if (
+            titre_lower.startswith(raw_marque)
+            or f" {raw_marque} " in f" {titre_lower} "
+        ):
             # Marque trouvée — chercher le modèle dans les mots suivants
             modele = _extract_modele_for_marque(titre, marque_canon)
             return marque_canon, modele
@@ -163,8 +192,8 @@ def _extract_marque_modele(titre: Optional[str]) -> tuple[Optional[str], Optiona
     return None, None
 
 
-def _extract_modele_for_marque(titre: str, marque: str) -> Optional[str]:
-    """Extrait le modèle en cherchant dans la liste des modèles connus pour cette marque."""
+def _extract_modele_for_marque(titre: str, marque: str) -> str | None:
+    """Extrait le modèle en cherchant dans la liste des modèles connus."""
     modeles = MODELES_CONNUS.get(marque, [])
     titre_lower = titre.lower()
 
@@ -180,7 +209,9 @@ def _extract_modele_for_marque(titre: str, marque: str) -> Optional[str]:
     return None
 
 
-def _extract_from_title(titre: Optional[str]) -> tuple[Optional[int], Optional[int]]:
+def _extract_from_title(
+    titre: str | None,
+) -> tuple[int | None, int | None]:
     """
     Tente d'extraire l'année et le kilométrage depuis le titre.
     Ex: 'Renault Clio 2019 85000 km' → (2019, 85000)
@@ -211,28 +242,29 @@ def _extract_from_title(titre: Optional[str]) -> tuple[Optional[int], Optional[i
     return annee, km
 
 
-def _parse_date(date_brut: Optional[str]) -> Optional[datetime]:
+def _parse_date(date_brut: str | None) -> dt.datetime | None:
     """
     Parse des formats de date courants sur les sites d'annonces.
-    LeBonCoin utilise des formulations relatives ('Aujourd'hui', 'Hier', '15 sept.').
+    LeBonCoin utilise des formulations relatives ('Aujourd'hui', 'Hier').
     """
     if not date_brut:
         return None
 
-    now = datetime.now(tz=timezone.utc)
+    now = dt.datetime.now(tz=dt.UTC)
     date_lower = date_brut.lower().strip()
 
     if "aujourd" in date_lower:
         return now
     if "hier" in date_lower:
-        from datetime import timedelta
-        return now - timedelta(days=1)
+        return now - dt.timedelta(days=1)
 
     # Tentative de parse de dates absolues
     formats = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"]
     for fmt in formats:
         try:
-            return datetime.strptime(date_brut.strip(), fmt).replace(tzinfo=timezone.utc)
+            return dt.datetime.strptime(date_brut.strip(), fmt).replace(
+                tzinfo=dt.UTC,
+            )
         except ValueError:
             continue
 

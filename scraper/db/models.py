@@ -7,20 +7,20 @@ Cette contrainte est vérifiée par le test tests/test_no_pii.py.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
+import datetime as dt
+import re
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-class Source(str, Enum):
+class Source(StrEnum):
     LEBONCOIN = "leboncoin"
     LACENTRALE = "lacentrale"
 
 
-class Statut(str, Enum):
+class Statut(StrEnum):
     NOUVEAU = "nouveau"
     QUALIFIE = "qualifie"
     NOTIFIE = "notifie"
@@ -31,17 +31,17 @@ class Statut(str, Enum):
 class AnnonceRaw(BaseModel):
     """
     Données brutes extraites par un collecteur, avant normalisation.
-    Les champs sont permissifs (Optional) car tous les sites ne fournissent pas
+    Les champs sont permissifs (X | None) car tous les sites ne fournissent pas
     les mêmes informations.
     """
     source: Source
     url_annonce: str
-    titre_brut: Optional[str] = None    # Ex: "Renault Clio IV 1.5 dCi 90ch"
-    prix_brut: Optional[str] = None     # Ex: "8 500 €" — sera parsé en Numeric
-    ville_brut: Optional[str] = None    # Ex: "Paris 75001" ou "Paris (75)"
-    date_publication_brut: Optional[str] = None
-    description: Optional[str] = None
-    image_url: Optional[str] = None
+    titre_brut: str | None = None    # Ex: "Renault Clio IV 1.5 dCi 90ch"
+    prix_brut: str | None = None     # Ex: "8 500 €" — sera parsé en Numeric
+    ville_brut: str | None = None    # Ex: "Paris 75001" ou "Paris (75)"
+    date_publication_brut: str | None = None
+    description: str | None = None
+    image_url: str | None = None
 
     @field_validator("url_annonce")
     @classmethod
@@ -52,7 +52,6 @@ class AnnonceRaw(BaseModel):
         """
         if not v or not v.strip():
             raise ValueError("url_annonce ne peut pas être vide")
-        import re
         if re.search(r"\b0[67]\d{8}\b", v):
             raise ValueError(f"URL suspecte : contient un pattern téléphone : {v}")
         return v
@@ -65,28 +64,29 @@ class AnnonceNormalisee(BaseModel):
     """
     source: Source
     url_annonce: str
-    marque: Optional[str] = None
-    modele: Optional[str] = None
-    annee: Optional[int] = Field(None, ge=1980, le=2030)
-    kilometrage: Optional[int] = Field(None, ge=0, le=2_000_000)
-    prix: Optional[float] = Field(None, ge=0, le=500_000)
-    ville: Optional[str] = None
-    code_postal: Optional[str] = None
-    description: Optional[str] = None
-    image_url: Optional[str] = None
-    date_publication: Optional[datetime] = None
-    date_collecte: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    hash_contenu: Optional[str] = None
+    marque: str | None = None
+    modele: str | None = None
+    annee: int | None = Field(None, ge=1980, le=2030)
+    kilometrage: int | None = Field(None, ge=0, le=2_000_000)
+    prix: float | None = Field(None, ge=0, le=500_000)
+    ville: str | None = None
+    code_postal: str | None = None
+    description: str | None = None
+    image_url: str | None = None
+    date_publication: dt.datetime | None = None
+    date_collecte: dt.datetime = Field(
+        default_factory=lambda: dt.datetime.now(dt.UTC),
+    )
+    hash_contenu: str | None = None
     score: float = Field(default=0.0, ge=0, le=100)
     statut: Statut = Statut.NOUVEAU
 
     @model_validator(mode="after")
-    def check_no_pii_in_description(self) -> "AnnonceNormalisee":
+    def check_no_pii_in_description(self) -> AnnonceNormalisee:
         """
         Garde-fou critique : vérifie que la description ne contient pas de PII.
         Ce validator est également testé par test_no_pii.py en CI.
         """
-        import re
         if self.description:
             # Pattern téléphone français (mobile + fixe)
             phone_pattern = r"\b0[1-9](?:[\s.\-]?\d{2}){4}\b"
@@ -115,15 +115,15 @@ class AnnonceNormalisee(BaseModel):
 
 class CritereRecherche(BaseModel):
     """Critère de recherche tel que stocké en base."""
-    id: Optional[UUID] = None
+    id: UUID | None = None
     nom: str
-    marque: Optional[str] = None
-    modele: Optional[str] = None
-    prix_min: Optional[float] = None
-    prix_max: Optional[float] = None
-    annee_min: Optional[int] = None
-    annee_max: Optional[int] = None
-    km_max: Optional[int] = None
-    zone_geo: Optional[str] = None
+    marque: str | None = None
+    modele: str | None = None
+    prix_min: float | None = None
+    prix_max: float | None = None
+    annee_min: int | None = None
+    annee_max: int | None = None
+    km_max: int | None = None
+    zone_geo: str | None = None
     priorite: int = Field(default=1, ge=1, le=5)
     actif: bool = True

@@ -6,13 +6,13 @@ Définit l'interface commune que chaque collecteur doit implémenter.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Iterator
+from collections.abc import Iterator
+from pathlib import Path
 
 import httpx
 import structlog
 import yaml
-from pathlib import Path
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from config.settings import ScraperConfig
 from db.models import AnnonceRaw
@@ -51,7 +51,7 @@ class BaseCollector(ABC):
         )
         self._log = logger.bind(collector=self.source_name)
 
-    def __enter__(self) -> "BaseCollector":
+    def __enter__(self) -> BaseCollector:
         return self
 
     def __exit__(self, *args: object) -> None:

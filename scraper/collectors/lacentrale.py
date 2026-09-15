@@ -5,12 +5,11 @@ Implémenté en Phase 2 après validation du collecteur LeBonCoin.
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 import structlog
 
 from collectors.base import BaseCollector
-from config.settings import ScraperConfig
 from db.models import AnnonceRaw
 
 logger = structlog.get_logger(__name__)

@@ -12,8 +12,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import sys
-from datetime import datetime, timezone
 
 import structlog
 from dotenv import load_dotenv
@@ -22,44 +22,64 @@ from dotenv import load_dotenv
 # En GitHub Actions, les secrets sont injectés directement dans l'environnement
 load_dotenv()
 
-from config.settings import AppConfig
-from collectors.leboncoin import LeBonCoinCollector
-from db.client import SupabaseClient
-from db.models import Statut
-from etl.normalize import normalize_annonce
-from etl.scoring import score_annonce
+from collectors.leboncoin import LeBonCoinCollector  # noqa: E402
+from config.settings import AppConfig  # noqa: E402
+from db.client import SupabaseClient  # noqa: E402
+from db.models import Statut  # noqa: E402
+from etl.normalize import normalize_annonce  # noqa: E402
+from etl.scoring import score_annonce  # noqa: E402
 
 # Configuration du logging structuré (JSON pour CI, humain-lisible en local)
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.stdlib.add_log_level,
-        structlog.dev.ConsoleRenderer() if sys.stdout.isatty() else structlog.processors.JSONRenderer(),
+        structlog.dev.ConsoleRenderer()
+        if sys.stdout.isatty()
+        else structlog.processors.JSONRenderer(),
     ]
 )
 logger = structlog.get_logger(__name__)
 
 
-def run_scraper(config: AppConfig, source: str | None = None, dry_run: bool = False) -> dict:
+def run_scraper(
+    config: AppConfig,
+    source: str | None = None,
+    dry_run: bool = False,
+) -> dict:
     """
     Lance le pipeline complet : collect → normalize → score → upsert.
 
     Retourne un dict de statistiques (inséré, mis à jour, ignoré, erreurs).
     """
-    stats = {"inserted": 0, "updated": 0, "skipped": 0, "errors": 0, "start": datetime.now(tz=timezone.utc).isoformat()}
+    stats = {
+        "inserted": 0,
+        "updated": 0,
+        "skipped": 0,
+        "errors": 0,
+        "start": dt.datetime.now(tz=dt.UTC).isoformat(),
+    }
 
     db = SupabaseClient(config.supabase)
     criteres = db.get_criteres_actifs()
 
     if not criteres:
-        logger.warning("no_active_criteria", msg="Aucun critère de recherche actif. Ajoutez des critères dans Supabase.")
+        logger.warning(
+            "no_active_criteria",
+            msg="Aucun critère de recherche actif. "
+            "Ajoutez des critères dans Supabase.",
+        )
 
     # Sélection des collecteurs à exécuter
     collectors_to_run = []
     if source is None or source == "leboncoin":
         collectors_to_run.append(LeBonCoinCollector(config.scraper))
 
-    logger.info("scraper_start", sources=[c.source_name for c in collectors_to_run], dry_run=dry_run)
+    logger.info(
+        "scraper_start",
+        sources=[c.source_name for c in collectors_to_run],
+        dry_run=dry_run,
+    )
 
     for collector in collectors_to_run:
         with collector:
@@ -76,11 +96,19 @@ def run_scraper(config: AppConfig, source: str | None = None, dry_run: bool = Fa
                     annonce = annonce.model_copy(update={
                         "score": score,
                         "critere_id": critere_id,
-                        "statut": Statut.QUALIFIE if score >= config.score_notification_threshold else Statut.NOUVEAU,
+                        "statut": (
+                            Statut.QUALIFIE
+                            if score >= config.score_notification_threshold
+                            else Statut.NOUVEAU
+                        ),
                     })
 
                     if dry_run:
-                        logger.info("dry_run_annonce", url=annonce.url_annonce, score=score)
+                        logger.info(
+                            "dry_run_annonce",
+                            url=annonce.url_annonce,
+                            score=score,
+                        )
                         stats["inserted"] += 1
                         continue
 
@@ -92,19 +120,34 @@ def run_scraper(config: AppConfig, source: str | None = None, dry_run: bool = Fa
                         stats["errors"] += 1
 
                 except Exception as exc:
-                    logger.error("pipeline_error", url=getattr(raw_annonce, "url_annonce", "?"), error=str(exc))
+                    logger.error(
+                        "pipeline_error",
+                        url=getattr(raw_annonce, "url_annonce", "?"),
+                        error=str(exc),
+                    )
                     stats["errors"] += 1
 
-    stats["end"] = datetime.now(tz=timezone.utc).isoformat()
+    stats["end"] = dt.datetime.now(tz=dt.UTC).isoformat()
     logger.info("scraper_done", **stats)
     return stats
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Nuevauto — Scraper d'annonces automobiles")
-    parser.add_argument("--heartbeat", action="store_true", help="Heartbeat Supabase uniquement")
-    parser.add_argument("--source", choices=["leboncoin", "lacentrale"], help="Source à scraper")
-    parser.add_argument("--dry-run", action="store_true", help="Scrape sans écrire en base")
+    parser = argparse.ArgumentParser(
+        description="Nuevauto — Scraper d'annonces automobiles",
+    )
+    parser.add_argument(
+        "--heartbeat", action="store_true",
+        help="Heartbeat Supabase uniquement",
+    )
+    parser.add_argument(
+        "--source", choices=["leboncoin", "lacentrale"],
+        help="Source à scraper",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Scrape sans écrire en base",
+    )
     args = parser.parse_args()
 
     try:
