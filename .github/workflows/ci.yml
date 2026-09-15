@@ -43,4 +43,5 @@ jobs:
       - name: 🔍 Linting
         run: |
           cd scraper
+          python -m ruff check . --select I --fix --no-cache
           python -m ruff check . --output-format=github
