@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.7.0",       # Validation des données scrapées
     "tenacity>=8.3.0",       # Retry automatique en cas d'erreur réseau
     "structlog>=24.2.0",     # Logging structuré (JSON) pour CI/CD
+    "PyYAML>=6.0.0",         # Parsing des sélecteurs CSS (selectors.yaml)
 ]
 
 [project.optional-dependencies]

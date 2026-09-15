@@ -7,7 +7,7 @@ Cette contrainte est vérifiée par le test tests/test_no_pii.py.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from uuid import UUID
@@ -47,9 +47,11 @@ class AnnonceRaw(BaseModel):
     @classmethod
     def url_must_not_contain_pii_patterns(cls, v: str) -> str:
         """
-        Garde-fou basique : l'URL ne doit pas contenir de numéros de téléphone.
-        Les sites sérieux n'en mettent pas dans les URLs, mais on vérifie.
+        Garde-fou : l'URL ne doit pas être vide, et ne doit pas contenir
+        de numéros de téléphone.
         """
+        if not v or not v.strip():
+            raise ValueError("url_annonce ne peut pas être vide")
         import re
         if re.search(r"\b0[67]\d{8}\b", v):
             raise ValueError(f"URL suspecte : contient un pattern téléphone : {v}")
@@ -73,7 +75,7 @@ class AnnonceNormalisee(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     date_publication: Optional[datetime] = None
-    date_collecte: datetime = Field(default_factory=datetime.utcnow)
+    date_collecte: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     hash_contenu: Optional[str] = None
     score: float = Field(default=0.0, ge=0, le=100)
     statut: Statut = Statut.NOUVEAU
