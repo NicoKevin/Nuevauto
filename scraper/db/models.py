@@ -40,6 +40,25 @@ class AnnonceRaw(BaseModel):
     prix_brut: str | None = None     # Ex: "8 500 €" — sera parsé en Numeric
     ville_brut: str | None = None    # Ex: "Paris 75001" ou "Paris (75)"
     date_publication_brut: str | None = None
+    attributs_bruts: str | None = None  # Chaîne brute des attributs sr-only
+    # --- Champs enrichis depuis la page détail (data-qa-id stables) ---
+    marque_brute: str | None = None       # Ex: "HONDA"
+    modele_brut: str | None = None        # Ex: "Accord"
+    annee_brute: str | None = None        # Ex: "2004"
+    kilometrage_brut: str | None = None   # Ex: "198000 km"
+    energie_brute: str | None = None      # Ex: "Essence"
+    boite_brute: str | None = None        # Ex: "Manuelle"
+    finition_brute: str | None = None     # Ex: "GT Line"
+    version_brute: str | None = None      # Ex: "1.6 HDi 110"
+    type_vehicule_brut: str | None = None # Ex: "Berline"
+    couleur_brute: str | None = None      # Ex: "Noir"
+    nb_portes_brut: str | None = None     # Ex: "5"
+    nb_places_brut: str | None = None     # Ex: "5"
+    puissance_fiscale_brute: str | None = None  # Ex: "6 CV"
+    puissance_din_brute: str | None = None      # Ex: "110 Ch"
+    ct_ok_brut: str | None = None         # Ex: "Oui"
+    crit_air_brut: str | None = None      # Ex: "1"
+    date_mise_circulation_brute: str | None = None  # Ex: "03/2019"
     description: str | None = None
     image_url: str | None = None
 
@@ -71,6 +90,21 @@ class AnnonceNormalisee(BaseModel):
     prix: float | None = Field(None, ge=0, le=500_000)
     ville: str | None = None
     code_postal: str | None = None
+    # --- Nouveaux champs véhicule (page détail) ---
+    energie: str | None = None          # Essence, Diesel, Hybride, Électrique
+    boite_vitesse: str | None = None    # Manuelle, Automatique
+    type_vehicule: str | None = None    # Berline, SUV, Break
+    couleur: str | None = None
+    nb_portes: int | None = None
+    nb_places: int | None = None
+    puissance_fiscale: int | None = None
+    puissance_din: str | None = None    # Ex: "110 Ch"
+    finition: str | None = None         # Ex: "GT Line"
+    version: str | None = None          # Ex: "1.6 HDi 110"
+    ct_ok: bool | None = None
+    crit_air: str | None = None
+    date_mise_circulation: str | None = None
+    # --- Champs existants ---
     description: str | None = None
     image_url: str | None = None
     date_publication: dt.datetime | None = None

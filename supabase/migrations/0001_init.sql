@@ -10,7 +10,7 @@
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS criteres_recherche (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nom         TEXT NOT NULL,
+    nom             TEXT NOT NULL,
     marque      TEXT,
     modele      TEXT,
     prix_min    NUMERIC(10, 2),

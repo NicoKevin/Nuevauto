@@ -29,6 +29,7 @@ jobs:
         run: |
           cd scraper
           pip install -e ".[dev]"
+          python -m playwright install chromium --with-deps
 
       - name: ✅ Tests anti-PII (BLOQUANTS)
         run: |

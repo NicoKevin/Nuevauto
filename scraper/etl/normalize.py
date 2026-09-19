@@ -96,13 +96,61 @@ def normalize_annonce(raw: AnnonceRaw) -> AnnonceNormalisee | None:
     Retourne None si les données sont trop incomplètes pour être utiles.
     """
     try:
-        marque, modele = _extract_marque_modele(raw.titre_brut)
+        # --- Marque & Modèle ---
+        # Priorité 1 : champs structurés de la page détail (data-qa-id fiables)
+        # Priorité 2 : inférence depuis le titre
+        if getattr(raw, "marque_brute", None):
+            marque = raw.marque_brute.strip().title()
+            # Correction des marques en MAJUSCULES (ex: "HONDA" -> "Honda", "BMW" -> "BMW")
+            marque = MARQUE_NORMALIZATION.get(marque.lower(), marque)
+            modele = raw.modele_brut.strip().title() if getattr(raw, "modele_brut", None) else None
+        else:
+            marque, modele = _extract_marque_modele(raw.titre_brut)
+
+        # --- Prix ---
         prix = _parse_prix(raw.prix_brut)
+
+        # --- Localisation ---
         ville, code_postal = _parse_localisation(raw.ville_brut)
-        annee, kilometrage = _extract_from_title(raw.titre_brut)
+
+        # --- Année & Kilométrage ---
+        # Priorité 1 : champs structurés de la page détail
+        annee = _parse_annee(getattr(raw, "annee_brute", None))
+        kilometrage = _parse_km(getattr(raw, "kilometrage_brut", None))
+        # Priorité 2 : attributs sr-only + titre
+        if not annee or not kilometrage:
+            annee2, km2 = _extract_annee_km(
+                raw.titre_brut,
+                getattr(raw, "attributs_bruts", None),
+            )
+            if not annee:
+                annee = annee2
+            if not kilometrage:
+                kilometrage = km2
+
         date_pub = _parse_date(raw.date_publication_brut)
 
-        # Calculer le hash du contenu pour détecter les mises à jour
+        # --- Champs véhicule enrichis (page détail) ---
+        energie = getattr(raw, "energie_brute", None)
+        boite_vitesse = getattr(raw, "boite_brute", None)
+        type_vehicule = getattr(raw, "type_vehicule_brut", None)
+        couleur = getattr(raw, "couleur_brute", None)
+        finition = getattr(raw, "finition_brute", None)
+        version = getattr(raw, "version_brute", None)
+        puissance_din = getattr(raw, "puissance_din_brute", None)
+        crit_air = getattr(raw, "crit_air_brut", None)
+        date_mise_circulation = getattr(raw, "date_mise_circulation_brute", None)
+
+        # Parsing des entiers (nb portes, places, CV fiscaux)
+        nb_portes = _parse_int(getattr(raw, "nb_portes_brut", None))
+        nb_places = _parse_int(getattr(raw, "nb_places_brut", None))
+        puissance_fiscale = _parse_int(getattr(raw, "puissance_fiscale_brute", None))
+
+        # CT OK (booléen depuis texte)
+        ct_ok_str = getattr(raw, "ct_ok_brut", None)
+        ct_ok = ct_ok_str.lower() in ("oui", "yes", "true") if ct_ok_str else None
+
+        # Hash du contenu pour détecter les mises à jour
         hash_input = f"{raw.url_annonce}|{raw.prix_brut}|{raw.titre_brut}"
         hash_contenu = hashlib.sha256(hash_input.encode()).hexdigest()
 
@@ -116,6 +164,19 @@ def normalize_annonce(raw: AnnonceRaw) -> AnnonceNormalisee | None:
             prix=prix,
             ville=ville,
             code_postal=code_postal,
+            energie=energie,
+            boite_vitesse=boite_vitesse,
+            type_vehicule=type_vehicule,
+            couleur=couleur,
+            nb_portes=nb_portes,
+            nb_places=nb_places,
+            puissance_fiscale=puissance_fiscale,
+            puissance_din=puissance_din,
+            finition=finition,
+            version=version,
+            ct_ok=ct_ok,
+            crit_air=crit_air,
+            date_mise_circulation=date_mise_circulation,
             description=raw.description,
             image_url=raw.image_url,
             date_publication=date_pub,
@@ -126,19 +187,54 @@ def normalize_annonce(raw: AnnonceRaw) -> AnnonceNormalisee | None:
         return None
 
 
+def _parse_int(val: str | None) -> int | None:
+    """Parse un entier depuis une chaîne brute. Ex: '5 CV' -> 5, '3' -> 3."""
+    if not val:
+        return None
+    digits = re.sub(r"[^\d]", "", val)
+    if not digits:
+        return None
+    try:
+        return int(digits)
+    except ValueError:
+        return None
+
+
 def _parse_prix(prix_brut: str | None) -> float | None:
     """Extrait le prix numérique depuis une chaîne comme '8 500 €' ou '12500€'."""
     if not prix_brut:
         return None
-    # Supprimer tout sauf chiffres et virgule/point
     cleaned = re.sub(
         r"[^\d,.]", "",
         prix_brut.replace("\u202f", "").replace("\xa0", ""),
     )
-    # Gérer les formats européens (virgule décimale)
     cleaned = cleaned.replace(",", ".")
     try:
         return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _parse_annee(annee_brute: str | None) -> int | None:
+    """Parse une année depuis une chaîne brute issue de la page détail. Ex: '2004' -> 2004"""
+    if not annee_brute:
+        return None
+    match = re.search(r"\b(19[9]\d|20[0-2]\d)\b", annee_brute)
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _parse_km(km_brut: str | None) -> int | None:
+    """Parse un kilométrage depuis une chaîne brute issue de la page détail. Ex: '198000 km' -> 198000"""
+    if not km_brut:
+        return None
+    km_str = re.sub(r"[^\d]", "", km_brut.replace("\u202f", "").replace("\xa0", ""))
+    if not km_str:
+        return None
+    try:
+        km = int(km_str)
+        return km if km <= 2_000_000 else None
     except ValueError:
         return None
 
@@ -189,6 +285,12 @@ def _extract_marque_modele(
             modele = _extract_modele_for_marque(titre, marque_canon)
             return marque_canon, modele
 
+    # 2. Chercher par modèle connu (plus spécifique, utile si la marque est absente du titre)
+    for marque_canon, modeles in MODELES_CONNUS.items():
+        for modele in modeles:
+            if titre_lower.startswith(modele.lower()) or f" {modele.lower()} " in f" {titre_lower} ":
+                return marque_canon, modele
+
     return None, None
 
 
@@ -209,35 +311,49 @@ def _extract_modele_for_marque(titre: str, marque: str) -> str | None:
     return None
 
 
-def _extract_from_title(
+def _extract_annee_km(
     titre: str | None,
+    attributs_bruts: str | None = None,
 ) -> tuple[int | None, int | None]:
     """
-    Tente d'extraire l'année et le kilométrage depuis le titre.
-    Ex: 'Renault Clio 2019 85000 km' → (2019, 85000)
-    Note: ces infos sont rarement dans le titre de LBC — souvent dans les détails.
+    Extrait l'année et le kilométrage depuis le titre ou les attributs bruts.
+    Ex: 'Renault Clio 2019 85000 km' ou 'Année: 2019. Kilométrage: 85000 km'
     """
-    if not titre:
-        return None, None
-
     annee = None
     km = None
 
-    # Année (entre 1990 et 2030)
-    year_match = re.search(r"\b(19[9]\d|20[0-2]\d)\b", titre)
-    if year_match:
-        annee = int(year_match.group(1))
+    # Tenter d'abord d'extraire depuis les attributs explicites (très fiables)
+    if attributs_bruts:
+        # Année: "2017" ou "Année 2017"
+        year_match = re.search(r"Ann(?:é|e|\\xe9)e\s*[:-]?\s*[\"\']?(19[9]\d|20[0-2]\d)[\"\']?", attributs_bruts, re.IGNORECASE)
+        if year_match:
+            annee = int(year_match.group(1))
 
-    # Kilométrage (ex: "85 000 km" ou "85000km")
-    km_match = re.search(r"(\d[\d\s]{2,6})\s*km\b", titre, re.IGNORECASE)
-    if km_match:
-        km_str = re.sub(r"\s", "", km_match.group(1))
-        try:
-            km = int(km_str)
-            if km > 2_000_000:
-                km = None  # Valeur aberrante
-        except ValueError:
-            km = None
+        # Kilométrage: "176500 km" ou "Kilométrage: 176500 km"
+        km_match = re.search(r"Kilom(?:é|e|\\xe9)trage\s*[:-]?\s*[\"\']?([\d\s]{2,7})[\"\']?\s*km", attributs_bruts, re.IGNORECASE)
+        if km_match:
+            km_str = re.sub(r"\s", "", km_match.group(1))
+            try:
+                km = int(km_str)
+                if km > 2_000_000: km = None
+            except ValueError:
+                km = None
+
+    # Fallback: extraction depuis le titre
+    if not annee and titre:
+        year_match = re.search(r"\b(19[9]\d|20[0-2]\d)\b", titre)
+        if year_match:
+            annee = int(year_match.group(1))
+
+    if not km and titre:
+        km_match = re.search(r"(\d[\d\s]{2,6})\s*km\b", titre, re.IGNORECASE)
+        if km_match:
+            km_str = re.sub(r"\s", "", km_match.group(1))
+            try:
+                km = int(km_str)
+                if km > 2_000_000: km = None
+            except ValueError:
+                km = None
 
     return annee, km
 

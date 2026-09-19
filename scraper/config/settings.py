@@ -36,11 +36,10 @@ class ScraperConfig:
     max_pages_per_run: int = 10
     # Nombre de retries en cas d'erreur réseau
     max_retries: int = 3
-    # User-Agent simulant un navigateur courant
+    # User-Agent pour se faire passer pour un navigateur classique
     user_agent: str = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
     # Headers communs envoyés avec chaque requête
     headers: dict = field(default_factory=lambda: {
@@ -49,6 +48,20 @@ class ScraperConfig:
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
     })
+    # Cookie Datadome pour bypasser l'anti-bot (gratuit)
+    datadome_cookie: str | None = None
+
+    @classmethod
+    def from_env(cls) -> ScraperConfig:
+        user_agent = os.environ.get("USER_AGENT", "").strip()
+        
+        config = cls(
+            datadome_cookie=os.environ.get("DATADOME_COOKIE", "").strip() or None,
+            user_agent=user_agent if user_agent else cls.__dataclass_fields__['user_agent'].default
+        )
+        if config.datadome_cookie:
+            config.headers["Cookie"] = f"datadome={config.datadome_cookie}"
+        return config
 
 
 @dataclass(frozen=True)
@@ -76,6 +89,6 @@ class AppConfig:
     def from_env(cls) -> AppConfig:
         return cls(
             supabase=SupabaseConfig.from_env(),
-            scraper=ScraperConfig(),
+            scraper=ScraperConfig.from_env(),
             notifications=NotificationConfig.from_env(),
         )

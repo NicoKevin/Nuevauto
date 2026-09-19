@@ -21,13 +21,11 @@ dependencies = [
     "tenacity>=8.3.0",       # Retry automatique en cas d'erreur réseau
     "structlog>=24.2.0",     # Logging structuré (JSON) pour CI/CD
     "PyYAML>=6.0.0",         # Parsing des sélecteurs CSS (selectors.yaml)
+    "playwright>=1.44.0",    # Navigateur headless pour bypass Datadome (LeBonCoin)
+    "playwright-stealth>=1.0.6", # Module anti-détection pour Playwright
 ]
 
 [project.optional-dependencies]
-playwright = [
-    # Optionnel — seulement si un site nécessite du JS
-    "playwright>=1.44.0",
-]
 dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",

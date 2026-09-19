@@ -11,18 +11,18 @@ leboncoin:
   # Sélecteurs pour la page de résultats
   listing:
     # Conteneur de chaque annonce dans les résultats
-    card_selector: "article[data-qa-id='aditem_container']"
-    # URL de l'annonce (attribut href du lien principal)
-    url_selector: "a[data-qa-id='aditem_container']"
+    card_selector: "article"
+    # URL de l'annonce
+    url_selector: "a[href^='/ad/voitures/']"
     url_attribute: "href"
-    # Prix
-    price_selector: "span[data-qa-id='aditem_price']"
-    # Titre (marque + modèle)
-    title_selector: "p[data-qa-id='aditem_title']"
+    # Prix (nouvelle structure, récupéré via le parser custom si introuvable)
+    price_selector: "p.text-callout"
+    # Titre (nouvelle structure, récupéré via l'attribut aria-label de l'article si introuvable)
+    title_selector: "p.text-body-1-highlight"
     # Localisation
-    location_selector: "p[data-qa-id='aditem_location']"
+    location_selector: "p.text-caption.text-neutral"
     # Date de publication
-    date_selector: "p[data-qa-id='aditem_date']"
+    date_selector: "p.text-caption"
   # Sélecteurs pour la page détail d'une annonce
   detail:
     price_selector: "span[data-qa-id='adview_price']"
