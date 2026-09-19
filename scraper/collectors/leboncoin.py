@@ -55,10 +55,11 @@ class LeBonCoinCollector(BaseCollector):
     def build_search_url(self, page: int = 1, category: str = "2", **kwargs: object) -> tuple[str, dict]:
         params = {
             "category": category,
-            "locations": VILLEMOMBLE_LOCATION,
-            "price_min": str(PRIX_MIN),
+            "locations": "Villemomble_93250__48.88492_2.51103_1838_20000",
+            "price": f"{PRIX_MIN}-max",
             "owner_type": "private",
-            "sort": "time,desc",       # Tri par date (les plus récentes en premier)
+            "sort": "time",
+            "order": "desc",       # Indispensable pour avoir les plus récentes !
             "page": str(page),
         }
         return self.BASE_URL, params
